@@ -119,7 +119,16 @@ class Data(BaseData):
     def whitelist(cls):
         if 'whitelist' in cls.cache:
             return cls.cache['whitelist']
-        cls._whitelist = BaseData(GithubData('members').getData()).login
+        cls._members = BaseData(GithubData('members').getData()).login
+        cls._extra_team = pd.Series(['mynameisvinn'])
+        cls._members = cls._members.append(cls._extra_team)
+        # add bots:
+        cls._bots = pd.Series([
+            'sourcery-ai[bot]',
+            'dependabot-preview[bot]',
+            'dependabot[bot]'
+        ])
+        cls._whitelist = cls._members.append(cls._bots, ignore_index=True)
         cls.cache['whitelist'] = cls._whitelist
         return cls._whitelist
 
