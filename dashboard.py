@@ -38,11 +38,13 @@ class RawData():
             headers=self.headers
         ).json()
 
-    def getData(self, params=None):
+    def getData(self, params=None, single=False):
         params = params or self.params
         params['per_page'] = 100
         params['page'] = 1
         results = []
+        if single:
+            return self.retrievePage(params)
         while r := self.retrievePage(params):
             params['page'] += 1
             results += r
@@ -50,16 +52,19 @@ class RawData():
 
 
 class GithubData(RawData):
-    def __init__(self, resource, params=None):
+    def __init__(self, resource, subresource=None, *, params=None):
         GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
-        self.headers = {'Authorization': f'token {GITHUB_TOKEN}'}
+        self.headers = {
+            'Authorization': f'token {GITHUB_TOKEN}'} if GITHUB_TOKEN else {}
         self.base_url = 'https://api.github.com'
         self.org = 'activeloopai'
         self.repo = 'Hub'
         self.resource = resource
+        self.subresource = subresource
         self.divisions = {
             'issues': 'repos',
             'commits': 'repos',
+            'traffic': 'repos',
             'members': 'orgs'
         }
         self.params = params or {}
@@ -70,7 +75,8 @@ class GithubData(RawData):
         url = f'{self.base_url}/{division}/{self.org}/'
         if division == 'repos':
             url += f'{self.repo}/'
-        return f'{url}{self.resource}'
+        url = f'{url}{self.resource}'
+        return f'{url}/{self.subresource}' if self.subresource else url
 
 
 class BaseData():
