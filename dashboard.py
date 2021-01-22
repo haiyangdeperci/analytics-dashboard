@@ -22,6 +22,10 @@ class TooManyAPICalls(DashboardException):
     pass
 
 
+class BadArguments(DashboardException):
+    pass
+
+
 class RawData():
     _api_calls = 0
 
@@ -142,8 +146,8 @@ class Data(BaseData):
         if by == 'community' and 'is_community' in self.data:
             return self.data[self.data.is_community]
 
-    def parse(self):
-        self.data = self.data.sort_values('created_at').reset_index(drop=True)
+    # def parse(self):
+    #     self.data = self.data.sort_values('created_at').reset_index(drop=True)
 
 
 class IssueData(Data):
@@ -154,7 +158,7 @@ class IssueData(Data):
             return True
         return False
 
-    def parse(self, removePullRequests=True):
+    def parse(self, removePullRequests=True, removeIssues=False):
         # restrict columns to cols if they exist
         cols = [
             'id', 'node_id', 'number', 'title', 'user', 'state',
@@ -165,6 +169,10 @@ class IssueData(Data):
 
         cols = self.data.columns.intersection(cols)
 
+        if removePullRequests and removeIssues:
+            raise BadArguments
+        if removeIssues:
+            self.data = self.data[~pd.isnull(self.data['pull_request'])]
         if removePullRequests and 'pull_request' in cols:
             self.data['pull_request'] = pd.isnull(self.data['pull_request'])
             self.data = self.data[self.data['pull_request']]
@@ -191,7 +199,7 @@ class IssueData(Data):
         self.data[
             'label_names'
         ] = self.data.labels.apply(self.parseNested, args=('name',))
-        super().parse()
+        # super().parse()
 
     def detach(self, **kwargs):
         # ideally detach does not change data
