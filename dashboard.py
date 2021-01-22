@@ -363,21 +363,132 @@ class VisitorData(Data):
 
 
 class Metric():
-    def __init__(self, data, underlying=None, name=None):
+    def __init__(self, data, underlying=None, name=None, measurements=None):
         self.data = data
         self.underlying = underlying
         self.name = name
-        self.series = pd.Series(name=self.name)
+        self.time_idx_name = 'created_at'
         self.thresholds = {'Week': 7, 'Month': 30, 'Quarter': 91}
 
+        self.data = self.data.sort_values(
+            self.time_idx_name).reset_index(drop=True)
         self.last_2Q_data = self.data[
-            self.data.created_at > (NOW - pd.Timedelta(days=184))
+            self.data[self.time_idx_name] > (NOW - pd.Timedelta(days=184))
         ]
+        self.customSetUp(measurements)
+        cols = self.last_2Q_data.columns
+        self.last_2Q_data = self.last_2Q_data[
+            cols.intersection(self.measurements + [self.time_idx_name])
+        ]
+
+        self.setTimeComponents(self.time_frame, self.tf_idx_name)
+        self.setTimeComponents(
+            self.last_2Q_data, self.time_idx_name, prefix=True)
+        self.fillResult()
+
+    def customSetUp(self):
+        pass
+
+    @staticmethod
+    def setTimeComponents(frame, date_col, prefix=None):
+        if prefix is None:
+            prefix = ''
+        elif prefix is True:
+            prefix = f'{date_col}.'
+        frame[prefix + 'Week'] = frame[date_col].dt.week
+        frame[prefix + 'Month'] = frame[date_col].dt.month
+        frame[prefix + 'Quarter'] = frame[date_col].dt.quarter
+
+    def fillResult(self):
+        # 'Count', 'Proportion', 'Last_30_day_average', 'This_Week_average',
+        # 'WeekTD', 'Prev_WeekTD', 'Week_dynamics', 'This_Month_average',
+        # 'MonthTD', 'Prev_MonthTD', 'Month_dynamics', This_Quarter_average',
+        # 'QuarterTD', 'Prev_QuarterTD', 'Quarter_dynamics'
+        self.setCount()
+        self.setProportion()
+        self.setLast30DayAverage()
+        self.setPeriodicData()
+
+    def setCount(self):
+        self.result['Count'] = self._count(self)
+
+    def __len__(self):
+        # if self.derived_from == 'issue':
+        #     return len(self.open_data)
+        return len(self.data)
+
+    def setProportion(self):
+        self.result['Proportion'] = self.ratio(True)
+
+    def ratio(self, stringify=False):
+        if self.underlying is not None:
+            r = len(self) / len(self.underlying)
+            return f'{r:.1%}' if stringify else r
+        return np.nan
+
+    def setLast30DayAverage(self):
+        self.result['Last_30_day_average'] = self.time_frame[
+            self.time_frame[self.tf_idx_name] > (NOW - pd.Timedelta(days=30))
+        ][self.measurements].mean().squeeze()
+
+    def setPeriodicData(self):
+        curWMQ = self.time_frame[
+            list(self.thresholds)].iloc[-1]
+        lastWMQ = pd.Series()
+
+        for period in self.thresholds:
+            last_idx = self.time_frame[
+                self.time_frame[period] == curWMQ[period]
+            ].first_valid_index() - 1
+            if last_idx > 0:
+                lastWMQ[period] = self.time_frame.loc[last_idx][period]
+            else:
+                lastWMQ[period] = np.nan
+
+            self.result[f'This_{period}_average'] = self.time_frame[
+                self.time_frame[period] == curWMQ[period]][
+                    self.measurements].mean().squeeze()
+
+            self.result[f'{period}TD'] = self.calcPeriodToDate(
+                self.last_2Q_data,
+                f'{self.time_idx_name}.{period}', curWMQ[period]
+            )
+
+            self.result[f'Prev_{period}TD'] = self.calcPeriodToDate(
+                self.last_2Q_data,
+                f'{self.time_idx_name}.{period}', lastWMQ[period]
+            )
+            self.setPeriodDynamics(period)
+
+    def calcPeriodToDate(self, data, date_col, period_metric):
+        return self._count(data[data[date_col] == period_metric])
+
+    def _count(self, collection):
+        return np.int64(len(collection))
+
+    def setPeriodDynamics(self, period):
+        self.result[f'{period}_dynamics'] = self._period_dynamics(
+            self.result[f'{period}TD'], self.result[f'Prev_{period}TD']
+        )
+
+    def _period_dynamics(self, current, last):
+        try:
+            return (current - last) / last
+        except ZeroDivisionError:
+            if current > last:
+                return float('inf')
+            return np.nan
+
+    def __getattr__(self, name):
+        return getattr(self.data, name)
+
+
+class CountMetric(Metric):
+    def customSetUp(self, measurements):
+        self.tf_idx_name = 'date'
+        self.measurements = ['count']
+        self.result = pd.Series(name=self.name)
         self.time_frame = self.overTime(self.last_2Q_data).reset_index()
-        breakpoint()
-        self.setTimeComponents(self.time_frame, 'date')
-        self.setTimeComponents(self.last_2Q_data, 'created_at', prefix=True)
-        self.fillSeries()
 
     def overTime(self, data):
         dr = pd.DataFrame({
@@ -399,98 +510,36 @@ class Metric():
             [dr.set_index('date'), cntOverTime], 1).drop('key', 1).fillna(0)
         return cntOverTime
 
-    @staticmethod
-    def setTimeComponents(frame, date_col, prefix=None):
-        if prefix is None:
-            prefix = ''
-        elif prefix is True:
-            prefix = f'{date_col}.'
-        frame[prefix + 'Week'] = frame[date_col].dt.week
-        frame[prefix + 'Month'] = frame[date_col].dt.month
-        frame[prefix + 'Quarter'] = frame[date_col].dt.quarter
-
-    def fillSeries(self):
-        # 'Count', 'Proportion', 'Last_30_day_average', 'This_Week_average',
-        # 'WeekTD', 'Prev_WeekTD', 'Week_dynamics', 'This_Month_average',
-        # 'MonthTD', 'Prev_MonthTD', 'Month_dynamics', This_Quarter_average',
-        # 'QuarterTD', 'Prev_QuarterTD', 'Quarter_dynamics'
-        self.setCount()
-        self.setProportion()
-        self.setLast30DayAverage()
-        self.setPeriodicData()
-
-    def setCount(self):
-        self.series['Count'] = len(self)
-
-    def __len__(self):
-        # if self.derived_from == 'issue':
-        #     return len(self.open_data)
-        return len(self.data)
-
-    def setProportion(self):
-        self.series['Proportion'] = self.ratio(True)
-
-    def ratio(self, stringify=False):
-        if self.underlying is not None:
-            r = len(self) / len(self.underlying)
-            return f'{r:.1%}' if stringify else r
-        return np.nan
-
-    # def setLast30Days(self):
-    #     self.series['Last_30_day_average'] = self.time_frame.tail(30)[
-    #         'count'].mean()
-    def setLast30DayAverage(self):
-        self.series['Last_30_day_average'] = self.time_frame[
-            self.time_frame.date > (NOW - pd.Timedelta(days=30))
-        ]['count'].mean()
-
-    def setPeriodicData(self):
-        curWMQ = self.time_frame[
-            list(self.thresholds)].iloc[-1]
-        lastWMQ = pd.Series()
-        for period in self.thresholds:
-            lastWMQ[period] = self.time_frame.loc[self.time_frame[
-                self.time_frame[period] == curWMQ[period]
-            ].first_valid_index() - 1][period]
-
-            self.series[f'This_{period}_average'] = self.time_frame[
-                self.time_frame[period] == curWMQ[period]]['count'].mean()
-
-            self.series[f'{period}TD'] = self.calcPeriodToDate(
-                self.last_2Q_data,
-                f'created_at.{period}', curWMQ[period]
-            )
-
-            self.series[f'Prev_{period}TD'] = self.calcPeriodToDate(
-                self.last_2Q_data,
-                f'created_at.{period}', lastWMQ[period]
-            )
-            self.setPeriodDynamics(period)
-
-    def calcPeriodToDate(self, data, date_col, period_metric):
-        return np.int64(len(data[data[date_col] == period_metric]))
-
-    def setPeriodDynamics(self, period):
-        self.series[f'{period}_dynamics'] = self._period_dynamics(
-            self.series[f'{period}TD'], self.series[f'Prev_{period}TD']
-        )
-
-    def _period_dynamics(self, current, last):
-        try:
-            return (current - last) / last
-        except ZeroDivisionError:
-            if current > last:
-                return float('inf')
-            return np.nan
-
-
-class CountMetric(Metric):
-    pass
-
 
 class TimeMetric(Metric):
-    def fillSeries(self):
-        pass
+    def customSetUp(self, measurements):
+        self.tf_idx_name = self.time_idx_name
+        self.measurements = measurements or [
+            'actual_resolution_time',
+            'predicted_resolution_time'
+        ]
+        named_measurements = [f'{self.name}.{m}' for m in self.measurements]
+        name_map = dict(zip(
+            self.measurements, named_measurements
+        ))
+        self.measurements = named_measurements
+        self.data = self.data.rename(columns=name_map)
+        self.last_2Q_data = self.last_2Q_data.rename(columns=name_map)
+        self.result = pd.DataFrame()
+        self.time_frame = self.last_2Q_data
+
+    def _count(self, collection):
+        if isinstance(collection, TimeMetric):
+            collection = self.data
+        collection = collection[self.measurements]
+        try:
+            return collection.sum()
+        except TypeError:
+            return pd.Series(index=collection.columns, dtype='timedelta64[ns]')
+
+    def __iter__(self):
+        row_result = self.result.T
+        return iter(row_result[s] for s in row_result)
 
 
 class MetricTable():
