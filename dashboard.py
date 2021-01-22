@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
+import pickle
 
 load_dotenv()
 
@@ -271,11 +272,94 @@ class CommitData(Data):
             self.data.created_at, utc=True
         )
         self.data['closed_at'] = pd.Series(pd.NaT, dtype='datetime64[ns, UTC]')
-        super().parse()
+        # super().parse()
 
     def detach(self, **kwargs):
         # by community
         return super().detach(by='community', **kwargs)
+
+
+class CommentData(Data):
+    '''probably better to inhertic from some BaseIssueData
+    because a lot of the code can be shared'''
+
+    def __init__(self, data, issue_data):
+        self.issue_data = issue_data
+        issue_cols = ['created_at', 'author_name', 'is_community']
+        self.issue_data = self.issue_data.set_index('number')[issue_cols]
+        super().__init__(data)
+
+    def parse(self):
+        self.data[[
+            'author_name', 'author_id'
+        ]] = self.data.user.apply(self.parseNested, args=('login', 'id'))
+        self.data.drop(['user'], 1, inplace=True)
+        self.data[['created_at', 'updated_at']] = self.data[[
+            'created_at', 'updated_at'
+        ]].apply(pd.to_datetime, utc=True)
+        # rename comment to closed_at as by commenting we are *closing*
+        self.data = self.data.rename(columns={'created_at': 'closed_at'})
+        self.data['number'] = pd.to_numeric(self.data.issue_url.str.rsplit(
+            '/', 1, expand=True)[1])
+        self.data['is_community'] = ~self.data.author_name.isin(
+            Data.whitelist()
+        )
+
+        self.data = self.data.set_index('number').join(
+            self.issue_data, rsuffix='_issue', how='right')
+        self.data = self.data.reset_index().sort_values('closed_at')
+        self.data['is_community'] = self.data.is_community.fillna(False)
+        # this might go into parsing here b/c its required for res_time -verify
+        # essentially it's leaving only first comments
+        self.data = self.data[
+            self.data.is_community_issue & ~self.data.is_community
+        ].drop_duplicates('number')
+
+        self.data[
+            'actual_resolution_time'
+        ] = self.data.closed_at - self.data.created_at
+        self.data[
+            'predicted_resolution_time'
+        ] = self.data.closed_at.fillna(NOW) - self.data.created_at
+        # add the issue create_at
+
+    def detach(self, **kwargs):
+        # get pull requests and issues separately - later
+
+        by = kwargs.pop('by')
+        if 'community' in by:
+            self.data = super().detach(by=by, **kwargs)
+        if 'first_comment' in by:
+            pass
+
+class VisitorData(Data):
+
+    def __init__(self, data, save=False):
+        self.storage_file = 'visitors.pkl'
+        self.old_data = self.load()
+        super().__init__(data)
+        if self.old_data:
+            # this could be improved to get data only X days
+            self.data = self.old_data.append(
+                self.data, ignore_index=True).drop_duplicates(keep='last')
+        if save:
+            self.save()
+
+    def parse(self):
+        self.data = pd.json_normalize(self.data.views)
+        self.data['timestamp'] = pd.to_datetime(self.data.timestamp, utc=True)
+        self.data = self.data.rename(columns={'timestamp': 'created_at'})
+        self.data['closed_at'] = pd.Series(pd.NaT, dtype='datetime64[ns, UTC]')
+
+    def load(self):
+        if os.path.exists(self.storage_file):
+            with open(self.storage_file, 'rb') as handle:
+                data = pickle.load(handle)
+            return data
+
+    def save(self):
+        with open(self.storage_file, 'wb') as handle:
+            pickle.dump(self.data, handle, -1)
 
 
 class Metric():
