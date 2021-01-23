@@ -545,18 +545,28 @@ class TimeMetric(Metric):
 class MetricTable():
 
     def __init__(self, metrics):
-        self.frame = pd.DataFrame([m.series for m in metrics])
+        all_series = []
+        for m in metrics:
+            if isinstance(m, TimeMetric):
+                all_series.extend([*m])
+            else:
+                all_series.append(m.result)
+        self.frame = pd.DataFrame(all_series)
 
 
 class Dashboard():
     '''streamlit representation of the dashboard'''
 
-    def __init__(self, metrics):
+    def __init__(self):
         self.time_start = time.time()
+
+    def receive(self, metrics):
         self.metrics = metrics
 
-    def draw(self):
+    def draw_canvas(self):
         st.title('Analytics Dashboard')
+
+    def draw_metrics(self):
         st.write('The metrics table', self.metrics)
         st.write('Dashboard load time:', time.time() - self.time_start)
 
