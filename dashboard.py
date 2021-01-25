@@ -572,21 +572,57 @@ class Dashboard():
 
 
 if __name__ == '__main__':
+    dashb = Dashboard()
+    dashb.draw_canvas()
+    cached_raw_visitors = GithubData('traffic', 'views').getData(single=True)
     cached_raw_issues = GithubData('issues').getData({'state': 'all'})
-    issueD = IssueData(
+    cached_raw_comments = GithubData('issues', 'comments').getData()
+
+    visitorD = VisitorData(cached_raw_visitors)
+    uniqueVisitors = visitorD.drop('count', 1)
+    allVisitors = visitorD.drop('uniques', 1)
+
+    issueD = IssueData(cached_raw_issues, parse=False)
+    issueD.parse(False, False)
+    commentD = CommentData(cached_raw_comments, issueD)
+
+    pullRequestD = IssueData(cached_raw_issues, parse=False)
+    pullRequestD.parse(False, True)
+    pullRequestD.detach(by='community')
+    pullRequestD = pullRequestD.data
+
+    bugD = IssueData(
+        cached_raw_issues).detach(by=['label'], labels=['bug'])['bug']
+
+
+    # eventually it should be just issueD for all
+    # currently .detach() breaks the structure of the collection
+    # this should be fixed
+    issueDCount = IssueData(
         cached_raw_issues
     )
-    issueDTime = IssueData(cached_raw_issues)
+    issueDTime = IssueData(cached_raw_issues).data
     commitD = CommitData(
         GithubData('commits').getData()
     )
-    labeledIssueD = issueD.detach(by=['state', 'label'], state='open')
+    # issueDCount loses unclosed issues
+    labeledIssueD = issueDCount.detach(by=['state', 'label'], state='open')
     table = MetricTable([
-        Metric(commitD.detach(), commitD, '(%) commits from the community'),
-        *[Metric(
-            issue, issueD, f'# of open {name}s'
-        ) for name, issue in labeledIssueD.items()]
+        CountMetric(
+            commitD.detach(), commitD, '(%) commits from the community'
+        ),
+        *[CountMetric(
+            issue, issueDCount, f'# of open {name}s'  # OK: out of open issues
+        ) for name, issue in labeledIssueD.items()],
+        TimeMetric(issueDTime, name='issue'),
+        TimeMetric(pullRequestD, name='pr'),
+        TimeMetric(bugD, name='bug'),
+        TimeMetric(commentD, name='to_first_comment'),  # time to first comment
+        TimeMetric(
+            uniqueVisitors, name='all visitors', measurements=['uniques']),
+        TimeMetric(allVisitors, name='all visitors', measurements=['count']),
+
     ]).frame
 
-    dashb = Dashboard(table)
-    dashb.draw()
+    dashb.receive(table)
+    dashb.draw_metrics()
