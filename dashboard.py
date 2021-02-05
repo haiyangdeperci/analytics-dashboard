@@ -1,4 +1,4 @@
-import time; time_start = time.time() # noqa
+import time
 import streamlit as st
 import requests
 import os
@@ -7,9 +7,6 @@ import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
 import pickle
-
-load_dotenv()
-
 
 START_DATETIME = pd.Timestamp(year=2019, month=8, day=1, tz='UTC')
 NOW = pd.Timestamp.now(tz='UTC')
@@ -263,7 +260,7 @@ class CommitData(Data):
             self.parseNested, args=('login',)
         )
         self.data['created_by'] = self.data.cm_login.fillna(self.data.cm_name)
-        print(type(self), dir(self))
+        # print(type(self), dir(self))
         self.data['created_by'] = self.data.created_by.replace(self.unlogged)
         self.data['is_community'] = ~self.data.created_by.isin(
             Data.whitelist()
@@ -572,6 +569,7 @@ class Dashboard():
 
 
 if __name__ == '__main__':
+    load_dotenv()
     dashb = Dashboard()
     dashb.draw_canvas()
     cached_raw_visitors = GithubData('traffic', 'views').getData(single=True)
