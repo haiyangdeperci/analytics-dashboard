@@ -381,12 +381,22 @@ class VisitorData(Data):
     def load(self):
         if os.path.exists(self.storage_file):
             with open(self.storage_file, 'rb') as handle:
-                data = pickle.load(handle)
-            return data
+                return pickle.load(handle)
 
     def save(self):
         with open(self.storage_file, 'wb') as handle:
             pickle.dump(self.data, handle, -1)
+
+
+class StargazerData(Data):
+    def parse(self):
+        self.data[[
+            'user_name', 'user_id'
+        ]] = self.data.user.apply(self.parseNested, args=('login', 'id'))
+        self.data.drop(['user'], 1, inplace=True)
+        self.data = self.data.rename(columns={'starred_at': 'created_at'})
+        self.data['created_at'] = pd.to_datetime(self.data.created_at, utc=True)
+        self.data['closed_at'] = pd.Series(pd.NaT, dtype='datetime64[ns, UTC]')
 
 
 class Metric():
@@ -614,8 +624,14 @@ if __name__ == '__main__':
     cached_raw_visitors = GithubData('traffic', 'views').getData(single=True)
     cached_raw_issues = GithubData('issues').getData({'state': 'all'})
     cached_raw_comments = GithubData('issues', 'comments').getData()
+    cached_raw_stargazers = GithubData(
+        'stargazers',
+        headers={'Accept': 'application/vnd.github.v3.star+json'}
+    ).getData()
 
-    visitorD = VisitorData(cached_raw_visitors)
+    stargazerD = StargazerData(cached_raw_stargazers)
+
+    visitorD = VisitorData(cached_raw_visitors, save=True)
     uniqueVisitors = visitorD.drop('count', 1)
     allVisitors = visitorD.drop('uniques', 1)
 
@@ -644,6 +660,13 @@ if __name__ == '__main__':
     )
     # issueDCount loses unclosed issues
     labeledIssueD = issueDCount.detach(by=['state', 'label'], state='open')
+
+    # test
+    stargM = CountMetric(stargazerD, name='stars')
+    uniqueVisM = TimeMetric(uniqueVisitors, name='visitors', measurements=['uniques'])
+    starpUniqVis = stargM.time_frame.rename(columns={'date': 'created_at'}).merge(uniqueVisM)
+    starpUniqVis['star/uVis'] = starpUniqVis['count'].diff() / starpUniqVis['visitors.uniques']
+
     table = MetricTable([
         CountMetric(
             commitD.detach(), commitD, '(%) commits from the community'
@@ -656,8 +679,10 @@ if __name__ == '__main__':
         TimeMetric(bugD, name='bug'),
         TimeMetric(commentD, name='to_first_comment'),  # time to first comment
         TimeMetric(
-            uniqueVisitors, name='all visitors', measurements=['uniques']),
-        TimeMetric(allVisitors, name='all visitors', measurements=['count']),
+            uniqueVisitors, name='visitors', measurements=['uniques']),
+        TimeMetric(allVisitors, name='visitors', measurements=['count']),
+        CountMetric(stargazerD, name='stars'),
+        TimeMetric(starpUniqVis, name='', measurements=['star/uVis'])
 
     ]).frame
 
