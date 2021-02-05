@@ -301,6 +301,10 @@ class CommitData(Data):
         # by community
         return super().detach(by='community', **kwargs)
 
+    def forMember(self, member):
+        self.data = self.data[~self.data['is_community']]
+        return self.data[self.data.created_by == member]
+
 
 class CommentData(Data):
     '''probably better to inhertic from some BaseIssueData
@@ -564,6 +568,15 @@ class TimeMetric(Metric):
         row_result = self.result.T
         return iter(row_result[s] for s in row_result)
 
+
+class TeamFilter():
+    def __init__(self, data):
+        self.member_data = {}
+        self.data = data
+
+    def filter(self):
+        for member in Data.whitelist():
+            self.member_data[member] = self.data.forMember(member)
 
 class MetricTable():
 
