@@ -29,10 +29,11 @@ class RawData():
 
     def __init__(self, url):
         self.url = url
+        self.dataDir = 'data'
 
     def retrievePage(self, params):
         RawData._api_calls += 1
-        if RawData._api_calls > 50:
+        if RawData._api_calls > 60:
             raise TooManyAPICalls
 
         return requests.get(
@@ -40,42 +41,67 @@ class RawData():
             headers=self.headers
         ).json()
 
-    def getData(self, params=None, single=False):
+    def getData(self, params=None, *, single=False, load=True, save=True):
+        if load and (load := self.store()):
+            return load
         params = params or self.params
         params['per_page'] = 100
         params['page'] = 1
-        results = []
         if single:
-            return self.retrievePage(params)
-        while r := self.retrievePage(params):
-            params['page'] += 1
-            results += r
+            results = self.retrievePage(params)
+        else:
+            results = []
+            while r := self.retrievePage(params):
+                params['page'] += 1
+                results += r
+        self.store(results)
         return results
+
+    def store(self, results=None):
+        if self.storage_file:
+            path = os.path.join(self.dataDir, self.storage_file)
+        if results is not None or os.path.exists(path):
+            mode = 'wb' if results else 'rb'
+            print(mode)
+            with open(path, mode) as handle:
+                if mode == 'rb':
+                    fileTimestamp = pd.to_datetime(os.path.getmtime(path), unit='s', utc=True)
+                    print(fileTimestamp, NOW)
+                    if NOW < fileTimestamp + pd.Timedelta(hours=1):
+                        return pickle.load(handle)
+                else:
+                    pickle.dump(results, handle, -1)
 
 
 class GithubData(RawData):
-    def __init__(self, resource, subresource=None, *, params=None):
+    def __init__(self, resource, subresource=None, *, params=None, headers=None):
         GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
         self.headers = {
             'Authorization': f'token {GITHUB_TOKEN}'} if GITHUB_TOKEN else {}
+        headers = headers or {}
+        self.headers = {**self.headers, **headers}
         self.base_url = 'https://api.github.com'
         self.org = 'activeloopai'
         self.repo = 'Hub'
         self.resource = resource
         self.subresource = subresource
+        self.storage_file = f"{self.repo}_GH_{self.resource}"
+        if self.subresource:
+            self.storage_file += f"_{self.subresource}"
         self.divisions = {
             'issues': 'repos',
             'commits': 'repos',
             'traffic': 'repos',
-            'members': 'orgs'
+            'stargazers': 'repos',
+            'members': 'orgs',
         }
         self.params = params or {}
-        self.url = self.build_url()
+        super().__init__(self.build_url())
 
     def build_url(self):
         division = self.divisions[self.resource]
         url = f'{self.base_url}/{division}/{self.org}/'
-        if division == 'repos':
+        if division != 'orgs':
             url += f'{self.repo}/'
         url = f'{url}{self.resource}'
         return f'{url}/{self.subresource}' if self.subresource else url
@@ -335,10 +361,10 @@ class VisitorData(Data):
         self.storage_file = 'visitors.pkl'
         self.old_data = self.load()
         super().__init__(data)
-        if self.old_data:
+        if self.old_data is not None:
             # this could be improved to get data only X days
             self.data = self.old_data.append(
-                self.data, ignore_index=True).drop_duplicates(keep='last')
+                self.data, ignore_index=True).drop_duplicates('created_at', keep='last')
         if save:
             self.save()
 
