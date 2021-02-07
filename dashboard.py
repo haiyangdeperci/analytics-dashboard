@@ -62,11 +62,9 @@ class RawData():
             path = os.path.join(self.dataDir, self.storage_file)
         if results is not None or os.path.exists(path):
             mode = 'wb' if results else 'rb'
-            print(mode)
             with open(path, mode) as handle:
                 if mode == 'rb':
                     fileTimestamp = pd.to_datetime(os.path.getmtime(path), unit='s', utc=True)
-                    print(fileTimestamp, NOW)
                     if NOW < fileTimestamp + pd.Timedelta(hours=1):
                         return pickle.load(handle)
                 else:
@@ -286,7 +284,6 @@ class CommitData(Data):
             self.parseNested, args=('login',)
         )
         self.data['created_by'] = self.data.cm_login.fillna(self.data.cm_name)
-        # print(type(self), dir(self))
         self.data['created_by'] = self.data.created_by.replace(self.unlogged)
         self.data['is_community'] = ~self.data.created_by.isin(
             Data.whitelist()
