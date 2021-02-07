@@ -30,6 +30,8 @@ class RawData():
     def __init__(self, url):
         self.url = url
         self.dataDir = 'data'
+        if not os.path.exists(self.dataDir):
+            os.mkdir(self.dataDir)
 
     def retrievePage(self, params):
         RawData._api_calls += 1
@@ -83,7 +85,7 @@ class GithubData(RawData):
         self.repo = 'Hub'
         self.resource = resource
         self.subresource = subresource
-        self.storage_file = f"{self.repo}_GH_{self.resource}"
+        self.storage_file = f"{self.repo}_GH_{self.resource}.pkl"
         if self.subresource:
             self.storage_file += f"_{self.subresource}"
         self.divisions = {
@@ -360,6 +362,7 @@ class VisitorData(Data):
 
     def __init__(self, data, save=False):
         self.storage_file = 'visitors.pkl'
+        self.dataDir = 'data'
         self.old_data = self.load()
         super().__init__(data)
         if self.old_data is not None:
@@ -376,12 +379,14 @@ class VisitorData(Data):
         self.data['closed_at'] = pd.Series(pd.NaT, dtype='datetime64[ns, UTC]')
 
     def load(self):
-        if os.path.exists(self.storage_file):
-            with open(self.storage_file, 'rb') as handle:
+        path = os.path.join(self.dataDir, self.storage_file)
+        if os.path.exists(path):
+            with open(path, 'rb') as handle:
                 return pickle.load(handle)
 
     def save(self):
-        with open(self.storage_file, 'wb') as handle:
+        path = os.path.join(self.dataDir, self.storage_file)
+        with open(path, 'wb') as handle:
             pickle.dump(self.data, handle, -1)
 
 

@@ -30,6 +30,8 @@ class RawData():
     def __init__(self, url):
         self.url = url
         self.dataDir = 'data'
+        if not os.path.exists(self.dataDir):
+            os.mkdir(self.dataDir)
 
     def retrievePage(self, params):
         RawData._api_calls += 1
@@ -45,13 +47,13 @@ class RawData():
         if False:
             load = NotImplemented
 
-        def __walrus_wrapper_load_35592334af6d47009b3043e36ad03b06(expr):
+        def __walrus_wrapper_load_8f6fb571cc224c3faa05234636cf4d53(expr):
             """Wrapper function for assignment expression."""
             nonlocal load
             load = expr
             return load
 
-        if load and (__walrus_wrapper_load_35592334af6d47009b3043e36ad03b06(self.store())):
+        if load and (__walrus_wrapper_load_8f6fb571cc224c3faa05234636cf4d53(self.store())):
             return load
         params = params or self.params
         params['per_page'] = 100
@@ -64,13 +66,13 @@ class RawData():
             if False:
                 r = NotImplemented
 
-            def __walrus_wrapper_r_53de14b815d9477c8f3df0f986dd0515(expr):
+            def __walrus_wrapper_r_a67ecb33a1c14ee49c863d7a1c59f2c2(expr):
                 """Wrapper function for assignment expression."""
                 nonlocal r
                 r = expr
                 return r
 
-            while __walrus_wrapper_r_53de14b815d9477c8f3df0f986dd0515(self.retrievePage(params)):
+            while __walrus_wrapper_r_a67ecb33a1c14ee49c863d7a1c59f2c2(self.retrievePage(params)):
                 params['page'] += 1
                 results += r
         self.store(results)
@@ -102,7 +104,7 @@ class GithubData(RawData):
         self.repo = 'Hub'
         self.resource = resource
         self.subresource = subresource
-        self.storage_file = f"{self.repo}_GH_{self.resource}"
+        self.storage_file = f"{self.repo}_GH_{self.resource}.pkl"
         if self.subresource:
             self.storage_file += f"_{self.subresource}"
         self.divisions = {
@@ -379,6 +381,7 @@ class VisitorData(Data):
 
     def __init__(self, data, save=False):
         self.storage_file = 'visitors.pkl'
+        self.dataDir = 'data'
         self.old_data = self.load()
         super().__init__(data)
         if self.old_data is not None:
@@ -395,12 +398,14 @@ class VisitorData(Data):
         self.data['closed_at'] = pd.Series(pd.NaT, dtype='datetime64[ns, UTC]')
 
     def load(self):
-        if os.path.exists(self.storage_file):
-            with open(self.storage_file, 'rb') as handle:
+        path = os.path.join(self.dataDir, self.storage_file)
+        if os.path.exists(path):
+            with open(path, 'rb') as handle:
                 return pickle.load(handle)
 
     def save(self):
-        with open(self.storage_file, 'wb') as handle:
+        path = os.path.join(self.dataDir, self.storage_file)
+        with open(path, 'wb') as handle:
             pickle.dump(self.data, handle, -1)
 
 
