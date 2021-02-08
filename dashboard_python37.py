@@ -4,9 +4,10 @@ import requests
 import os
 import numpy as np
 import pandas as pd
-import plotly.express as px
 from dotenv import load_dotenv
 import pickle
+import warnings
+
 
 START_DATETIME = pd.Timestamp(year=2019, month=8, day=1, tz='UTC')
 NOW = pd.Timestamp.now(tz='UTC')
@@ -47,13 +48,13 @@ class RawData():
         if False:
             load = NotImplemented
 
-        def __walrus_wrapper_load_8f6fb571cc224c3faa05234636cf4d53(expr):
+        def __walrus_wrapper_load_23aecf59421345139b2fd75bc3979469(expr):
             """Wrapper function for assignment expression."""
             nonlocal load
             load = expr
             return load
 
-        if load and (__walrus_wrapper_load_8f6fb571cc224c3faa05234636cf4d53(self.store())):
+        if load and (__walrus_wrapper_load_23aecf59421345139b2fd75bc3979469(self.store())):
             return load
         params = params or self.params
         params['per_page'] = 100
@@ -66,13 +67,13 @@ class RawData():
             if False:
                 r = NotImplemented
 
-            def __walrus_wrapper_r_a67ecb33a1c14ee49c863d7a1c59f2c2(expr):
+            def __walrus_wrapper_r_4c1f623bef754d1b8757de0a6052f2af(expr):
                 """Wrapper function for assignment expression."""
                 nonlocal r
                 r = expr
                 return r
 
-            while __walrus_wrapper_r_a67ecb33a1c14ee49c863d7a1c59f2c2(self.retrievePage(params)):
+            while __walrus_wrapper_r_4c1f623bef754d1b8757de0a6052f2af(self.retrievePage(params)):
                 params['page'] += 1
                 results += r
         self.store(results)
@@ -640,6 +641,7 @@ class Dashboard():
 
 if __name__ == '__main__':
     load_dotenv()
+    warnings.filterwarnings("ignore")
     dashb = Dashboard()
     dashb.draw_canvas()
     cached_raw_visitors = GithubData('traffic', 'views').getData(single=True)

@@ -4,9 +4,10 @@ import requests
 import os
 import numpy as np
 import pandas as pd
-import plotly.express as px
 from dotenv import load_dotenv
 import pickle
+import warnings
+
 
 START_DATETIME = pd.Timestamp(year=2019, month=8, day=1, tz='UTC')
 NOW = pd.Timestamp.now(tz='UTC')
@@ -621,6 +622,7 @@ class Dashboard():
 
 if __name__ == '__main__':
     load_dotenv()
+    warnings.filterwarnings("ignore")
     dashb = Dashboard()
     dashb.draw_canvas()
     cached_raw_visitors = GithubData('traffic', 'views').getData(single=True)
