@@ -2,11 +2,11 @@
 
 ## Use
 Deployed with Streamlit sharing. You can access it [here](https://share.streamlit.io/haiyangdeperci/analytics-dashboard/dashboard_python37.py).
-You may also clone and run the code locally in the following way:
+You may also clone to your current directory and run the code locally in the following way:
 ```
-git clone https://github.com/haiyangdeperci/analytics-dashboard.git
-pip install -e analytics-dashboard/
-streamlit run analytics-dashboard/dashboard.py
+git clone https://github.com/haiyangdeperci/analytics-dashboard.git .
+pip install -r requirements.txt
+streamlit run dashboard.py
 ```
 
 ## Notes
