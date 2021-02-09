@@ -5,9 +5,12 @@ import os
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
-import pickle
 import warnings
-
+import sys
+if sys.hexversion <= 0x3080000:
+    import pickle5 as pickle
+else:
+    import pickle
 
 START_DATETIME = pd.Timestamp(year=2019, month=8, day=1, tz='UTC')
 NOW = pd.Timestamp.now(tz='UTC')
@@ -70,6 +73,7 @@ class RawData():
             return results
 
     def store(self, results=None, *, cache_time=3600):
+
         if self.storage_file:
             path = os.path.join(self.dataDir, self.storage_file)
         if results is not None or os.path.exists(path):

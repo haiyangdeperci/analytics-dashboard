@@ -5,9 +5,12 @@ import os
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
-import pickle
 import warnings
-
+import sys
+if sys.hexversion <= 0x3080000:
+    import pickle5 as pickle
+else:
+    import pickle
 
 START_DATETIME = pd.Timestamp(year=2019, month=8, day=1, tz='UTC')
 NOW = pd.Timestamp.now(tz='UTC')
@@ -54,13 +57,13 @@ class RawData():
         if False:
             load = NotImplemented
 
-        def __walrus_wrapper_load_7511e44083e947eb8a1a065213e2274a(expr):
+        def __walrus_wrapper_load_b9693f46f9474044965c3da06c5f5a48(expr):
             """Wrapper function for assignment expression."""
             nonlocal load
             load = expr
             return load
 
-        if load and (__walrus_wrapper_load_7511e44083e947eb8a1a065213e2274a(self.store())):
+        if load and (__walrus_wrapper_load_b9693f46f9474044965c3da06c5f5a48(self.store())):
             return load
         params = params or self.params
         params['per_page'] = 100
@@ -73,13 +76,13 @@ class RawData():
             if False:
                 r = NotImplemented
 
-            def __walrus_wrapper_r_5c7d3b05493447678566babbb8d0772b(expr):
+            def __walrus_wrapper_r_ef99d2b8202d4c809ad10c1da279e36e(expr):
                 """Wrapper function for assignment expression."""
                 nonlocal r
                 r = expr
                 return r
 
-            while __walrus_wrapper_r_5c7d3b05493447678566babbb8d0772b(self.retrievePage(params)):
+            while __walrus_wrapper_r_ef99d2b8202d4c809ad10c1da279e36e(self.retrievePage(params)):
                 params['page'] += 1
                 results += r
         if self.brokenData:
@@ -89,6 +92,7 @@ class RawData():
             return results
 
     def store(self, results=None, *, cache_time=3600):
+
         if self.storage_file:
             path = os.path.join(self.dataDir, self.storage_file)
         if results is not None or os.path.exists(path):
