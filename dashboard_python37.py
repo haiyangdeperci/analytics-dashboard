@@ -54,13 +54,13 @@ class RawData():
         if False:
             load = NotImplemented
 
-        def __walrus_wrapper_load_4f3d802b4bca455ba7646698ffa79d47(expr):
+        def __walrus_wrapper_load_7511e44083e947eb8a1a065213e2274a(expr):
             """Wrapper function for assignment expression."""
             nonlocal load
             load = expr
             return load
 
-        if load and (__walrus_wrapper_load_4f3d802b4bca455ba7646698ffa79d47(self.store())):
+        if load and (__walrus_wrapper_load_7511e44083e947eb8a1a065213e2274a(self.store())):
             return load
         params = params or self.params
         params['per_page'] = 100
@@ -73,13 +73,13 @@ class RawData():
             if False:
                 r = NotImplemented
 
-            def __walrus_wrapper_r_443fb3f94ab448278578f1afa6cd23c9(expr):
+            def __walrus_wrapper_r_5c7d3b05493447678566babbb8d0772b(expr):
                 """Wrapper function for assignment expression."""
                 nonlocal r
                 r = expr
                 return r
 
-            while __walrus_wrapper_r_443fb3f94ab448278578f1afa6cd23c9(self.retrievePage(params)):
+            while __walrus_wrapper_r_5c7d3b05493447678566babbb8d0772b(self.retrievePage(params)):
                 params['page'] += 1
                 results += r
         if self.brokenData:
@@ -114,9 +114,10 @@ class GithubData(RawData):
         self.repo = 'Hub'
         self.resource = resource
         self.subresource = subresource
-        self.storage_file = f"{self.repo}_GH_{self.resource}.pkl"
+        self.storage_file = f"{self.repo}_GH_{self.resource}"
         if self.subresource:
             self.storage_file += f"_{self.subresource}"
+        self.storage_file += '.pkl'
         self.divisions = {
             'issues': 'repos',
             'commits': 'repos',

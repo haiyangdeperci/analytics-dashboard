@@ -95,9 +95,10 @@ class GithubData(RawData):
         self.repo = 'Hub'
         self.resource = resource
         self.subresource = subresource
-        self.storage_file = f"{self.repo}_GH_{self.resource}.pkl"
+        self.storage_file = f"{self.repo}_GH_{self.resource}"
         if self.subresource:
             self.storage_file += f"_{self.subresource}"
+        self.storage_file += '.pkl'
         self.divisions = {
             'issues': 'repos',
             'commits': 'repos',
