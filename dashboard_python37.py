@@ -31,6 +31,7 @@ class RawData():
     def __init__(self, url):
         self.url = url
         self.dataDir = 'data'
+        self.brokenData = False
         if not os.path.exists(self.dataDir):
             os.mkdir(self.dataDir)
 
@@ -39,22 +40,27 @@ class RawData():
         if RawData._api_calls > 60:
             raise TooManyAPICalls
 
-        return requests.get(
+        r = requests.get(
             self.url, params=params,
             headers=self.headers
-        ).json()
+        )
+        if r.status_code == 200:
+            return r.json()
+        else:
+            self.brokenData = True
+            return []
 
     def getData(self, params=None, *, single=False, load=True, save=True):
         if False:
             load = NotImplemented
 
-        def __walrus_wrapper_load_23aecf59421345139b2fd75bc3979469(expr):
+        def __walrus_wrapper_load_4f3d802b4bca455ba7646698ffa79d47(expr):
             """Wrapper function for assignment expression."""
             nonlocal load
             load = expr
             return load
 
-        if load and (__walrus_wrapper_load_23aecf59421345139b2fd75bc3979469(self.store())):
+        if load and (__walrus_wrapper_load_4f3d802b4bca455ba7646698ffa79d47(self.store())):
             return load
         params = params or self.params
         params['per_page'] = 100
@@ -67,19 +73,22 @@ class RawData():
             if False:
                 r = NotImplemented
 
-            def __walrus_wrapper_r_4c1f623bef754d1b8757de0a6052f2af(expr):
+            def __walrus_wrapper_r_443fb3f94ab448278578f1afa6cd23c9(expr):
                 """Wrapper function for assignment expression."""
                 nonlocal r
                 r = expr
                 return r
 
-            while __walrus_wrapper_r_4c1f623bef754d1b8757de0a6052f2af(self.retrievePage(params)):
+            while __walrus_wrapper_r_443fb3f94ab448278578f1afa6cd23c9(self.retrievePage(params)):
                 params['page'] += 1
                 results += r
-        self.store(results)
-        return results
+        if self.brokenData:
+            return self.store()
+        else:
+            self.store(results)
+            return results
 
-    def store(self, results=None):
+    def store(self, results=None, *, cache_time=3600):
         if self.storage_file:
             path = os.path.join(self.dataDir, self.storage_file)
         if results is not None or os.path.exists(path):
@@ -87,7 +96,7 @@ class RawData():
             with open(path, mode) as handle:
                 if mode == 'rb':
                     fileTimestamp = pd.to_datetime(os.path.getmtime(path), unit='s', utc=True)
-                    if NOW < fileTimestamp + pd.Timedelta(hours=1):
+                    if NOW < fileTimestamp + pd.Timedelta(seconds=cache_time) or self.brokenData:
                         return pickle.load(handle)
                 else:
                     pickle.dump(results, handle, -1)
@@ -486,9 +495,20 @@ class Metric():
         return np.nan
 
     def setLast30DayAverage(self):
-        self.result['Last_30_day_average'] = self.time_frame[
-            self.time_frame[self.tf_idx_name] > (NOW - pd.Timedelta(days=30))
-        ][self.measurements].mean().squeeze()
+        day_diff = pd.Timedelta(days=30)
+        self.result['Last_30_day_average'] = self._calc_avg(
+            self.time_frame[self.tf_idx_name] > (NOW - day_diff)
+        )
+
+    def _limit_time_frame(self, truth_table):
+        return self.time_frame[truth_table][self.measurements]
+
+    def _calc_avg(self, truth_table):
+        calced = self._limit_time_frame(truth_table)
+        if isinstance(self, CountMetric):
+            calced = calced.diff().fillna(0)
+
+        return calced.mean().squeeze()
 
     def setPeriodicData(self):
         curWMQ = self.time_frame[
@@ -504,9 +524,9 @@ class Metric():
             else:
                 lastWMQ[period] = np.nan
 
-            self.result[f'This_{period}_average'] = self.time_frame[
-                self.time_frame[period] == curWMQ[period]][
-                    self.measurements].mean().squeeze()
+            self.result[f'This_{period}_average'] = self._calc_avg(
+                self.time_frame[period] == curWMQ[period]
+            )
 
             self.result[f'{period}TD'] = self.calcPeriodToDate(
                 self.last_2Q_data,
@@ -550,9 +570,10 @@ class CountMetric(Metric):
         self.time_frame = self.overTime(self.last_2Q_data).reset_index()
 
     def overTime(self, data):
+        start = data[self.time_idx_name].iloc[0].normalize()
         dr = pd.DataFrame({
             'key': -1,
-            'date': pd.date_range(START_DATETIME, NOW, freq='D')
+            'date': pd.date_range(start, NOW, freq='D')
         })
         data['key'] = -1
         merged = pd.merge(dr, data, on='key')
@@ -653,7 +674,6 @@ if __name__ == '__main__':
     ).getData()
 
     stargazerD = StargazerData(cached_raw_stargazers)
-
     visitorD = VisitorData(cached_raw_visitors, save=True)
     uniqueVisitors = visitorD.drop('count', 1)
     allVisitors = visitorD.drop('uniques', 1)
@@ -685,9 +705,9 @@ if __name__ == '__main__':
     labeledIssueD = issueDCount.detach(by=['state', 'label'], state='open')
 
     # test
-    stargM = CountMetric(stargazerD, name='stars')
-    uniqueVisM = TimeMetric(uniqueVisitors, name='visitors', measurements=['uniques'])
-    starpUniqVis = stargM.time_frame.rename(columns={'date': 'created_at'}).merge(uniqueVisM)
+    stargazerMetric = CountMetric(stargazerD, name='stars')
+    uniqueVisMetric = TimeMetric(uniqueVisitors, name='visitors', measurements=['uniques'])
+    starpUniqVis = stargazerMetric.time_frame.rename(columns={'date': 'created_at'}).merge(uniqueVisMetric)
     starpUniqVis['star/uVis'] = starpUniqVis['count'].diff() / starpUniqVis['visitors.uniques']
 
     table = MetricTable([
@@ -701,10 +721,9 @@ if __name__ == '__main__':
         TimeMetric(pullRequestD, name='pr'),
         TimeMetric(bugD, name='bug'),
         TimeMetric(commentD, name='to_first_comment'),  # time to first comment
-        TimeMetric(
-            uniqueVisitors, name='visitors', measurements=['uniques']),
+        uniqueVisMetric,
         TimeMetric(allVisitors, name='visitors', measurements=['count']),
-        CountMetric(stargazerD, name='stars'),
+        stargazerMetric,
         TimeMetric(starpUniqVis, name='', measurements=['star/uVis'])
 
     ]).frame
