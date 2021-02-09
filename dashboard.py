@@ -655,7 +655,6 @@ if __name__ == '__main__':
     ).getData()
 
     stargazerD = StargazerData(cached_raw_stargazers)
-
     visitorD = VisitorData(cached_raw_visitors, save=True)
     uniqueVisitors = visitorD.drop('count', 1)
     allVisitors = visitorD.drop('uniques', 1)
@@ -687,9 +686,9 @@ if __name__ == '__main__':
     labeledIssueD = issueDCount.detach(by=['state', 'label'], state='open')
 
     # test
-    stargM = CountMetric(stargazerD, name='stars')
-    uniqueVisM = TimeMetric(uniqueVisitors, name='visitors', measurements=['uniques'])
-    starpUniqVis = stargM.time_frame.rename(columns={'date': 'created_at'}).merge(uniqueVisM)
+    stargazerMetric = CountMetric(stargazerD, name='stars')
+    uniqueVisMetric = TimeMetric(uniqueVisitors, name='visitors', measurements=['uniques'])
+    starpUniqVis = stargazerMetric.time_frame.rename(columns={'date': 'created_at'}).merge(uniqueVisMetric)
     starpUniqVis['star/uVis'] = starpUniqVis['count'].diff() / starpUniqVis['visitors.uniques']
 
     table = MetricTable([
@@ -703,10 +702,9 @@ if __name__ == '__main__':
         TimeMetric(pullRequestD, name='pr'),
         TimeMetric(bugD, name='bug'),
         TimeMetric(commentD, name='to_first_comment'),  # time to first comment
-        TimeMetric(
-            uniqueVisitors, name='visitors', measurements=['uniques']),
+        uniqueVisMetric,
         TimeMetric(allVisitors, name='visitors', measurements=['count']),
-        CountMetric(stargazerD, name='stars'),
+        stargazerMetric,
         TimeMetric(starpUniqVis, name='', measurements=['star/uVis'])
 
     ]).frame
