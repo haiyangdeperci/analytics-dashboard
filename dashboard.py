@@ -476,9 +476,20 @@ class Metric():
         return np.nan
 
     def setLast30DayAverage(self):
-        self.result['Last_30_day_average'] = self.time_frame[
-            self.time_frame[self.tf_idx_name] > (NOW - pd.Timedelta(days=30))
-        ][self.measurements].mean().squeeze()
+        day_diff = pd.Timedelta(days=30)
+        self.result['Last_30_day_average'] = self._calc_avg(
+            self.time_frame[self.tf_idx_name] > (NOW - day_diff)
+        )
+
+    def _limit_time_frame(self, truth_table):
+        return self.time_frame[truth_table][self.measurements]
+
+    def _calc_avg(self, truth_table):
+        calced = self._limit_time_frame(truth_table)
+        if isinstance(self, CountMetric):
+            calced = calced.diff().fillna(0)
+
+        return calced.mean().squeeze()
 
     def setPeriodicData(self):
         curWMQ = self.time_frame[
@@ -494,9 +505,9 @@ class Metric():
             else:
                 lastWMQ[period] = np.nan
 
-            self.result[f'This_{period}_average'] = self.time_frame[
-                self.time_frame[period] == curWMQ[period]][
-                    self.measurements].mean().squeeze()
+            self.result[f'This_{period}_average'] = self._calc_avg(
+                self.time_frame[period] == curWMQ[period]
+            )
 
             self.result[f'{period}TD'] = self.calcPeriodToDate(
                 self.last_2Q_data,
@@ -540,9 +551,10 @@ class CountMetric(Metric):
         self.time_frame = self.overTime(self.last_2Q_data).reset_index()
 
     def overTime(self, data):
+        start = data[self.time_idx_name].iloc[0].normalize()
         dr = pd.DataFrame({
             'key': -1,
-            'date': pd.date_range(START_DATETIME, NOW, freq='D')
+            'date': pd.date_range(start, NOW, freq='D')
         })
         data['key'] = -1
         merged = pd.merge(dr, data, on='key')
