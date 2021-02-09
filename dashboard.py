@@ -31,6 +31,7 @@ class RawData():
     def __init__(self, url):
         self.url = url
         self.dataDir = 'data'
+        self.brokenData = False
         if not os.path.exists(self.dataDir):
             os.mkdir(self.dataDir)
 
@@ -39,10 +40,15 @@ class RawData():
         if RawData._api_calls > 60:
             raise TooManyAPICalls
 
-        return requests.get(
+        r = requests.get(
             self.url, params=params,
             headers=self.headers
-        ).json()
+        )
+        if r.status_code == 200:
+            return r.json()
+        else:
+            self.brokenData = True
+            return []
 
     def getData(self, params=None, *, single=False, load=True, save=True):
         if load and (load := self.store()):
@@ -57,10 +63,13 @@ class RawData():
             while r := self.retrievePage(params):
                 params['page'] += 1
                 results += r
-        self.store(results)
-        return results
+        if self.brokenData:
+            return self.store()
+        else:
+            self.store(results)
+            return results
 
-    def store(self, results=None):
+    def store(self, results=None, *, cache_time=3600):
         if self.storage_file:
             path = os.path.join(self.dataDir, self.storage_file)
         if results is not None or os.path.exists(path):
@@ -68,7 +77,7 @@ class RawData():
             with open(path, mode) as handle:
                 if mode == 'rb':
                     fileTimestamp = pd.to_datetime(os.path.getmtime(path), unit='s', utc=True)
-                    if NOW < fileTimestamp + pd.Timedelta(hours=1):
+                    if NOW < fileTimestamp + pd.Timedelta(seconds=cache_time) or self.brokenData:
                         return pickle.load(handle)
                 else:
                     pickle.dump(results, handle, -1)
