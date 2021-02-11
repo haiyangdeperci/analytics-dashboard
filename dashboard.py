@@ -7,6 +7,8 @@ import pandas as pd
 from dotenv import load_dotenv
 import warnings
 import sys
+import operator
+import functools
 if sys.hexversion <= 0x3080000:
     import pickle5 as pickle
 else:
@@ -422,7 +424,7 @@ class Metric():
         self.underlying = underlying
         self.name = name
         self.time_idx_name = 'created_at'
-        self.thresholds = {'Week': 7, 'Month': 30, 'Quarter': 91}
+        self.defineThresholdandDynamics()
 
         self.data = self.data.sort_values(
             self.time_idx_name).reset_index(drop=True)
@@ -438,7 +440,13 @@ class Metric():
         self.setTimeComponents(self.time_frame, self.tf_idx_name)
         self.setTimeComponents(
             self.last_2Q_data, self.time_idx_name, prefix=True)
+
         self.fillResult()
+
+    def defineThresholdandDynamics(self):
+        self.thresholds = {'Week': 7, 'Month': 30, 'Quarter': 91}
+        self._dynamics = '_dynamics'
+        self.dynCols = [f"{period}{self._dynamics}" for period in self.thresholds]
 
     def customSetUp(self):
         pass
@@ -454,17 +462,17 @@ class Metric():
         frame[prefix + 'Quarter'] = frame[date_col].dt.quarter
 
     def fillResult(self):
-        # 'Count', 'Proportion', 'Last_30_day_average', 'This_Week_average',
+        # 'Total', 'Proportion', 'Last_30_day_average', 'This_Week_average',
         # 'WeekTD', 'Prev_WeekTD', 'Week_dynamics', 'This_Month_average',
         # 'MonthTD', 'Prev_MonthTD', 'Month_dynamics', This_Quarter_average',
         # 'QuarterTD', 'Prev_QuarterTD', 'Quarter_dynamics'
-        self.setCount()
+        self.setTotal()
         self.setProportion()
         self.setLast30DayAverage()
         self.setPeriodicData()
 
-    def setCount(self):
-        self.result['Count'] = self._count(self)
+    def setTotal(self):
+        self.result['Total'] = self._count(self)
 
     def __len__(self):
         # if self.derived_from == 'issue':
@@ -482,7 +490,7 @@ class Metric():
 
     def setLast30DayAverage(self):
         day_diff = pd.Timedelta(days=30)
-        self.result['Last_30_day_average'] = self._calc_avg(
+        self.result['30_day_average'] = self._calc_avg(
             self.time_frame[self.tf_idx_name] > (NOW - day_diff)
         )
 
@@ -510,7 +518,7 @@ class Metric():
             else:
                 lastWMQ[period] = np.nan
 
-            self.result[f'This_{period}_average'] = self._calc_avg(
+            self.result[f'{period}_average'] = self._calc_avg(
                 self.time_frame[period] == curWMQ[period]
             )
 
@@ -532,7 +540,7 @@ class Metric():
         return np.int64(len(collection))
 
     def setPeriodDynamics(self, period):
-        self.result[f'{period}_dynamics'] = self._period_dynamics(
+        self.result[f'{period}{self._dynamics}'] = self._period_dynamics(
             self.result[f'{period}TD'], self.result[f'Prev_{period}TD']
         )
 
@@ -603,9 +611,34 @@ class TimeMetric(Metric):
         except TypeError:
             return pd.Series(index=collection.columns, dtype='timedelta64[ns]')
 
+    def fillResult(self):
+        super().fillResult()
+        self.roundToSeconds()
+
+    def roundToSeconds(self):
+        try:
+            rounded = self.result.drop(self.dynCols, 1).applymap(
+                lambda x: x.round('s'), na_action='ignore')
+            self.result.loc[:, rounded.columns] = rounded
+        except AttributeError:
+            pass
+
     def __iter__(self):
         row_result = self.result.T
         return iter(row_result[s] for s in row_result)
+
+
+class CombinedMetric(Metric):
+    def __init__(self, *metrics, op='truediv', name=None):
+        self.metrics = [m.result.squeeze() for m in metrics]
+        self.result = functools.reduce(getattr(operator, op), self.metrics)
+        self.result.name = name
+        self.setPeriodDynamics()
+
+    def setPeriodDynamics(self):
+        self.defineThresholdandDynamics()
+        for period in self.thresholds:
+            super().setPeriodDynamics(period)
 
 
 class TeamFilter():
@@ -638,11 +671,25 @@ class Dashboard():
     def receive(self, metrics):
         self.metrics = metrics
 
+    def parse_metrics(self):
+        styled = self.metrics.copy()
+        dyn_cols = styled.columns[
+            styled.columns.str.endswith('dynamics')]
+        styled[dyn_cols] = styled[dyn_cols].applymap(
+            '{:.1%}'.format, na_action='ignore')
+        styled = styled.fillna('-')
+        return styled.style.set_precision(2)
+
+        # self.metrics = self.metrics.style.format("{:.1%}", subset=dyn_cols)
+
     def draw_canvas(self):
         st.title('Analytics Dashboard')
 
     def draw_metrics(self):
-        st.write('The metrics table', self.metrics)
+        # breakpoint()
+        styled = self.parse_metrics()
+        st.write('The metrics table')
+        st.table(styled)
         st.write('Dashboard load time:', time.time() - self.time_start)
 
 
@@ -690,11 +737,9 @@ if __name__ == '__main__':
     # issueDCount loses unclosed issues
     labeledIssueD = issueDCount.detach(by=['state', 'label'], state='open')
 
-    # test
     stargazerMetric = CountMetric(stargazerD, name='stars')
     uniqueVisMetric = TimeMetric(uniqueVisitors, name='visitors', measurements=['uniques'])
-    starpUniqVis = stargazerMetric.time_frame.rename(columns={'date': 'created_at'}).merge(uniqueVisMetric)
-    starpUniqVis['star/uVis'] = starpUniqVis['count'].diff() / starpUniqVis['visitors.uniques']
+    starpUniqVis = CombinedMetric(stargazerMetric, uniqueVisMetric, name='star/uVis')
 
     table = MetricTable([
         CountMetric(
@@ -707,10 +752,10 @@ if __name__ == '__main__':
         TimeMetric(pullRequestD, name='pr'),
         TimeMetric(bugD, name='bug'),
         TimeMetric(commentD, name='to_first_comment'),  # time to first comment
-        uniqueVisMetric,
         TimeMetric(allVisitors, name='visitors', measurements=['count']),
+        uniqueVisMetric,
         stargazerMetric,
-        TimeMetric(starpUniqVis, name='', measurements=['star/uVis'])
+        starpUniqVis
 
     ]).frame
 
