@@ -56,17 +56,17 @@ class RawData():
             self.brokenData = True
             return []
 
-    def getData(self, params=None, *, single=False, load=True, save=True):
+    def getData(self, params=None, *, single=False, load=True, save=st.secrets['streamlit']['SHARING'] is False):
         if False:
             load = NotImplemented
 
-        def __walrus_wrapper_load_113a202403ac4879936e572c5f44a841(expr):
+        def __walrus_wrapper_load_762247776a3e463fb8c77af45d641a9f(expr):
             """Wrapper function for assignment expression."""
             nonlocal load
             load = expr
             return load
 
-        if load and (__walrus_wrapper_load_113a202403ac4879936e572c5f44a841(self.store())):
+        if load and (__walrus_wrapper_load_762247776a3e463fb8c77af45d641a9f(self.store())):
             return load
         params = params or self.params
         params['per_page'] = 100
@@ -79,13 +79,13 @@ class RawData():
             if False:
                 r = NotImplemented
 
-            def __walrus_wrapper_r_7c97cc183c8b4cae9520fd85088ad32a(expr):
+            def __walrus_wrapper_r_bd85b68a79b541cd8d3cb7d69bf7e032(expr):
                 """Wrapper function for assignment expression."""
                 nonlocal r
                 r = expr
                 return r
 
-            while __walrus_wrapper_r_7c97cc183c8b4cae9520fd85088ad32a(self.retrievePage(params)):
+            while __walrus_wrapper_r_bd85b68a79b541cd8d3cb7d69bf7e032(self.retrievePage(params)):
                 params['page'] += 1
                 results += r
         if self.brokenData:
@@ -397,7 +397,7 @@ class CommentData(Data):
 
 class VisitorData(Data):
 
-    def __init__(self, data, save=False):
+    def __init__(self, data, save=st.secrets['streamlit']['SHARING'] is False):
         self.storage_file = 'visitors.pkl'
         self.dataDir = 'data'
         self.old_data = self.load()

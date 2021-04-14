@@ -56,7 +56,7 @@ class RawData():
             self.brokenData = True
             return []
 
-    def getData(self, params=None, *, single=False, load=True, save=True):
+    def getData(self, params=None, *, single=False, load=True, save=st.secrets['streamlit']['SHARING'] is False):
         if load and (load := self.store()):
             return load
         params = params or self.params
@@ -378,7 +378,7 @@ class CommentData(Data):
 
 class VisitorData(Data):
 
-    def __init__(self, data, save=False):
+    def __init__(self, data, save=st.secrets['streamlit']['SHARING'] is False):
         self.storage_file = 'visitors.pkl'
         self.dataDir = 'data'
         self.old_data = self.load()
