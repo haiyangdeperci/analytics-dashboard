@@ -4,7 +4,6 @@ import requests
 import os
 import numpy as np
 import pandas as pd
-from dotenv import load_dotenv
 import warnings
 import sys
 import operator
@@ -93,7 +92,7 @@ class RawData():
 
 class GithubData(RawData):
     def __init__(self, resource, subresource=None, *, params=None, headers=None):
-        GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
+        GITHUB_TOKEN = st.secrets['github']['GITHUB_TOKEN']
         self.headers = {
             'Authorization': f'token {GITHUB_TOKEN}'} if GITHUB_TOKEN else {}
         headers = headers or {}
@@ -696,7 +695,6 @@ class Dashboard():
 
 
 if __name__ == '__main__':
-    load_dotenv()
     warnings.filterwarnings("ignore")
     dashb = Dashboard()
     dashb.draw_canvas()
@@ -741,7 +739,7 @@ if __name__ == '__main__':
 
     stargazerMetric = CountMetric(stargazerD, name='stars')
     uniqueVisMetric = TimeMetric(uniqueVisitors, name='visitors', measurements=['uniques'])
-    starpUniqVis = CombinedMetric(stargazerMetric, uniqueVisMetric, name='star/uVis')
+    starpUniqVis = CombinedMetric(stargazerMetric, uniqueVisMetric, name='stars / unique visitor')
 
     table = MetricTable([
         CountMetric(
