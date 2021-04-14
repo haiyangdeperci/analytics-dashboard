@@ -691,7 +691,11 @@ class Dashboard():
         styled = self.parse_metrics()
         st.write('The metrics table')
         st.table(styled)
-        st.write('Dashboard load time:', time.time() - self.time_start)
+        st.write(
+            f"Dashboard retrieval timestamp:", pd.Timestamp(
+                self.time_start, unit='s', tz='Europe/Warsaw'
+            ).replace(nanosecond=0).isoformat())
+        st.write(f"Dashboard load time: {time.time() - self.time_start:.2f}s")
 
 
 if __name__ == '__main__':

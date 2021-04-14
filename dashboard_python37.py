@@ -60,13 +60,13 @@ class RawData():
         if False:
             load = NotImplemented
 
-        def __walrus_wrapper_load_0d178848e7b947819802a681ab602220(expr):
+        def __walrus_wrapper_load_8d900616e0fa4e0185ba3bfc32a3cd17(expr):
             """Wrapper function for assignment expression."""
             nonlocal load
             load = expr
             return load
 
-        if load and (__walrus_wrapper_load_0d178848e7b947819802a681ab602220(self.store())):
+        if load and (__walrus_wrapper_load_8d900616e0fa4e0185ba3bfc32a3cd17(self.store())):
             return load
         params = params or self.params
         params['per_page'] = 100
@@ -79,13 +79,13 @@ class RawData():
             if False:
                 r = NotImplemented
 
-            def __walrus_wrapper_r_10e5ed19a844420cb80e22de1100e0bf(expr):
+            def __walrus_wrapper_r_1a24e3385f274456a4cf9d2d01a872be(expr):
                 """Wrapper function for assignment expression."""
                 nonlocal r
                 r = expr
                 return r
 
-            while __walrus_wrapper_r_10e5ed19a844420cb80e22de1100e0bf(self.retrievePage(params)):
+            while __walrus_wrapper_r_1a24e3385f274456a4cf9d2d01a872be(self.retrievePage(params)):
                 params['page'] += 1
                 results += r
         if self.brokenData:
@@ -710,7 +710,11 @@ class Dashboard():
         styled = self.parse_metrics()
         st.write('The metrics table')
         st.table(styled)
-        st.write('Dashboard load time:', time.time() - self.time_start)
+        st.write(
+            f"Dashboard retrieval timestamp:", pd.Timestamp(
+                self.time_start, unit='s', tz='Europe/Warsaw'
+            ).replace(nanosecond=0).isoformat())
+        st.write(f"Dashboard load time: {time.time() - self.time_start:.2f}s")
 
 
 if __name__ == '__main__':
