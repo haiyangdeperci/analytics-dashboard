@@ -711,7 +711,7 @@ if __name__ == '__main__':
     ).getData()
 
     stargazerD = StargazerData(cached_raw_stargazers)
-    visitorD = VisitorData(cached_raw_visitors, save=True)
+    visitorD = VisitorData(cached_raw_visitors)  # if not on st.sharing add save=True
     uniqueVisitors = visitorD.drop('count', 1)
     allVisitors = visitorD.drop('uniques', 1)
 

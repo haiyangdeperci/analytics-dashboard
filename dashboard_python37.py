@@ -60,13 +60,13 @@ class RawData():
         if False:
             load = NotImplemented
 
-        def __walrus_wrapper_load_8d900616e0fa4e0185ba3bfc32a3cd17(expr):
+        def __walrus_wrapper_load_113a202403ac4879936e572c5f44a841(expr):
             """Wrapper function for assignment expression."""
             nonlocal load
             load = expr
             return load
 
-        if load and (__walrus_wrapper_load_8d900616e0fa4e0185ba3bfc32a3cd17(self.store())):
+        if load and (__walrus_wrapper_load_113a202403ac4879936e572c5f44a841(self.store())):
             return load
         params = params or self.params
         params['per_page'] = 100
@@ -79,13 +79,13 @@ class RawData():
             if False:
                 r = NotImplemented
 
-            def __walrus_wrapper_r_1a24e3385f274456a4cf9d2d01a872be(expr):
+            def __walrus_wrapper_r_7c97cc183c8b4cae9520fd85088ad32a(expr):
                 """Wrapper function for assignment expression."""
                 nonlocal r
                 r = expr
                 return r
 
-            while __walrus_wrapper_r_1a24e3385f274456a4cf9d2d01a872be(self.retrievePage(params)):
+            while __walrus_wrapper_r_7c97cc183c8b4cae9520fd85088ad32a(self.retrievePage(params)):
                 params['page'] += 1
                 results += r
         if self.brokenData:
@@ -730,7 +730,7 @@ if __name__ == '__main__':
     ).getData()
 
     stargazerD = StargazerData(cached_raw_stargazers)
-    visitorD = VisitorData(cached_raw_visitors, save=True)
+    visitorD = VisitorData(cached_raw_visitors)  # if not on st.sharing add save=True
     uniqueVisitors = visitorD.drop('count', 1)
     allVisitors = visitorD.drop('uniques', 1)
 
