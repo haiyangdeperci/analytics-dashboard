@@ -17,5 +17,9 @@ streamlit run dashboard.py
     ```
     The resulting file, `dashboard_python37.py`, is used in Streamlit sharing. You can adapt it for previous Python 3 versions in a similar fashion.
 
-2. This code could be easily adapted to other repositories than `activeloopai/Hub` if needed.
-3. The data is fetched and updated on refresh of the dashboard, however not more frequently than every hour.
+2. The requirements file for this code is generated with `pipreqs`:
+    ```
+    pipreqs --savepath requirements.txt
+    ```
+3. This code could be easily adapted to other repositories than `activeloopai/Hub` if needed.
+4. The data is fetched and updated on refresh of the dashboard, however not more frequently than every hour.
