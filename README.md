@@ -22,4 +22,4 @@ streamlit run dashboard.py
     pipreqs --savepath requirements.txt
     ```
 3. This code could be easily adapted to other repositories than `activeloopai/Hub` if needed.
-4. The data is fetched and updated on refresh of the dashboard, however not more frequently than every hour.
+4. The data is fetched and updated on refresh of the dashboard, however not more frequently than every hour. It may take up to 2 minutes to load if not used frequently.
