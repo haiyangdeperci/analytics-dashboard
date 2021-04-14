@@ -28,16 +28,18 @@ class BadArguments(DashboardException):
 class RawData():
     _api_calls = 0
 
-    def __init__(self, url):
+    def __init__(self, url, exceed=True, limit=None):
         self.url = url
         self.dataDir = 'data'
         self.brokenData = False
+        self.exceed = exceed
+        self.limit = limit or float('inf')
         if not os.path.exists(self.dataDir):
             os.mkdir(self.dataDir)
 
     def retrievePage(self, params):
         RawData._api_calls += 1
-        if RawData._api_calls > 60:
+        if not self.exceed and RawData._api_calls > self.limit:
             raise TooManyAPICalls
 
         r = requests.get(
@@ -106,8 +108,9 @@ class GithubData(RawData):
             'stargazers': 'repos',
             'members': 'orgs',
         }
+        self.rate_limit = 60
         self.params = params or {}
-        super().__init__(self.build_url())
+        super().__init__(self.build_url(), limit=self.rate_limit)
 
     def build_url(self):
         division = self.divisions[self.resource]
@@ -638,8 +641,14 @@ class Dashboard():
         st.title('Analytics Dashboard')
 
     def draw_metrics(self):
-        st.write('The metrics table', self.metrics)
-        st.write('Dashboard load time:', time.time() - self.time_start)
+        styled = self.parse_metrics()
+        st.write('The metrics table')
+        st.table(styled)
+        st.write(
+            f"Dashboard retrieval timestamp:", pd.Timestamp(
+                self.time_start, unit='s', tz='Europe/Warsaw'
+            ).replace(nanosecond=0).isoformat())
+        st.write(f"Dashboard load time: {time.time() - self.time_start:.2f}s")
 
 
 if __name__ == '__main__':
